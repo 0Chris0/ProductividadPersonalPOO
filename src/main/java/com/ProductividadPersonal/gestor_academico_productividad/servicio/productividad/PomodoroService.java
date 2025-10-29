@@ -1,22 +1,62 @@
 package com.ProductividadPersonal.gestor_academico_productividad.servicio.productividad;
 
 import org.springframework.stereotype.Service;
-import java.time.LocalDate;
 
-@Service // Clase que gestiona la lógica de registro de tiempo de enfoque
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
 public class PomodoroService {
 
-    // Si tuvieras una entidad SesionPomodoro, la inyectarías aquí.
+    // Historial de sesiones (en memoria)
+    private final List<SesionPomodoro> historial = new ArrayList<>();
 
-    public void registrarSesionCompleta(int minutosEnfoque) {
-        // Lógica: Guardar la sesión en la base de datos para el historial
-        System.out.println("DEBUG: Sesión Pomodoro de " + minutosEnfoque + " min. registrada.");
+    // Tiempo por defecto en minutos
+    private int duracionPomodoro = 25;
+
+    // ===================== CLASE INTERNA =====================
+    public static class SesionPomodoro {
+        private final LocalDate fecha;
+        private final int minutos;
+
+        public SesionPomodoro(LocalDate fecha, int minutos) {
+            this.fecha = fecha;
+            this.minutos = minutos;
+        }
+
+        public LocalDate getFecha() { return fecha; }
+        public int getMinutos() { return minutos; }
     }
 
-    /** CRUCIAL PARA EL REPORTE SEMANAL */
+    // ===================== CONFIGURACIÓN =====================
+    public void setDuracionPomodoro(int minutos) {
+        if(minutos <= 0) throw new IllegalArgumentException("La duración debe ser mayor a 0.");
+        duracionPomodoro = minutos;
+        System.out.println("DEBUG: Duración del Pomodoro ajustada a " + duracionPomodoro + " minutos.");
+    }
+
+    public int getDuracionPomodoro() {
+        return duracionPomodoro;
+    }
+
+    // ===================== REGISTRO =====================
+    public void registrarSesionCompleta(Integer minutos) {
+        int minutosRegistrados = minutos != null ? minutos : duracionPomodoro;
+        historial.add(new SesionPomodoro(LocalDate.now(), minutosRegistrados));
+        System.out.println("DEBUG: Sesión Pomodoro de " + minutosRegistrados + " min. registrada.");
+    }
+
+    // ===================== REPORTE =====================
     public long contarMinutosEnfoqueEnPeriodo(LocalDate inicio, LocalDate fin) {
-        // Implementación real: sumar los minutos de enfoque registrados
-        System.out.println("DEBUG: Sumando minutos de enfoque para reporte...");
-        return 125; // Valor de prueba
+        return historial.stream()
+                .filter(s -> !s.getFecha().isBefore(inicio) && !s.getFecha().isAfter(fin))
+                .mapToLong(SesionPomodoro::getMinutos)
+                .sum();
+    }
+
+    // ===================== LISTAR HISTORIAL =====================
+    public List<SesionPomodoro> obtenerHistorial() {
+        return new ArrayList<>(historial);
     }
 }

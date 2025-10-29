@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.swing.JOptionPane;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class ReporteController {
@@ -22,6 +24,18 @@ public class ReporteController {
      */
     public ReporteSemanal generarDatosReporte() {
         return reporteService.generarReporteSemanal();
+    }
+
+    /**
+     * Método que retorna una lista de reportes semanales.
+     * Por ahora, genera un ejemplo usando generarDatosReporte().
+     */
+    public List<ReporteSemanal> obtenerReportes() {
+        List<ReporteSemanal> lista = new ArrayList<>();
+        // Simulación de múltiples reportes
+        lista.add(generarDatosReporte()); // primer reporte
+        // Puedes agregar más reportes de ejemplo si quieres
+        return lista;
     }
 
     /**

@@ -9,84 +9,68 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.List;
 
-@Service // Marca la clase como un Servicio de Spring
+@Service
 public class TareaService {
 
     private final TareaRepository tareaRepository;
-    private final TableroService tableroService; // Inyección de TableroService para lógica de tableros
+    private final TableroService tableroService;
 
-    @Autowired // Inyección de Repositorio y Servicio
+    @Autowired
     public TareaService(TareaRepository tareaRepository, TableroService tableroService) {
         this.tareaRepository = tareaRepository;
         this.tableroService = tableroService;
     }
 
-    /**
-     * Guarda una nueva tarea en la base de datos, asignándola a un tablero.
-     * @param tarea La entidad Tarea a guardar.
-     * @param tableroId El ID del tablero al que pertenece.
-     * @return La Tarea guardada.
-     */
+    // Guardar nueva tarea en un tablero
     public Tarea guardarTarea(Tarea tarea, Long tableroId) {
-        // Lógica de negocio: Asigna la tarea al tablero (usando el TableroService)
         Tablero tablero = tableroService.obtenerTodos().stream()
                 .filter(t -> t.getId().equals(tableroId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Tablero con ID " + tableroId + " no encontrado."));
+                .orElseThrow(() -> new RuntimeException("Tablero no encontrado"));
 
-        // Asignación de valores por defecto si son nulos
-        if (tarea.getPrioridad() == null) {
-            tarea.setPrioridad(3); // Baja
-        }
-        if (tarea.getEstado() == null) {
-            tarea.setEstado("PENDIENTE");
-        }
+        if (tarea.getEstado() == null) tarea.setEstado("PENDIENTE");
+        if (tarea.getPrioridad() == null) tarea.setPrioridad(3);
 
         tarea.setTablero(tablero);
         return tareaRepository.save(tarea);
     }
 
-    /**
-     * Mueve una tarea entre las columnas del Kanban (cambia su estado).
-     * @param id ID de la tarea a mover.
-     * @param nuevoEstado Nuevo estado (ej. "EN_PROCESO").
-     * @return La Tarea actualizada.
-     */
+    // Mover tarea entre estados
     public Tarea moverTarea(Long id, String nuevoEstado) {
         Tarea tarea = tareaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Tarea con ID " + id + " no encontrada."));
+                .orElseThrow(() -> new RuntimeException("Tarea no encontrada"));
         tarea.setEstado(nuevoEstado);
         return tareaRepository.save(tarea);
     }
 
-    /**
-     * Obtiene todas las tareas de un estado específico (columna del Kanban).
-     * @param estado El estado a filtrar.
-     * @return Lista de tareas ordenadas por prioridad.
-     */
+    // Borrar tarea
+    public void borrarTarea(Long id) {
+        if (tareaRepository.existsById(id)) {
+            tareaRepository.deleteById(id);
+        }
+    }
+
+    // Obtener tareas por estado
     public List<Tarea> obtenerTareasPorEstado(String estado) {
         return tareaRepository.findByEstadoOrderByPrioridadDesc(estado);
     }
 
-    /**
-     * CRUCIAL PARA EL REPORTE SEMANAL (Módulo 5)
-     * Cuenta el número de tareas completadas en un período.
-     */
+    // ================= REPORTE =================
+    // Contar tareas completadas en un rango de fechas
     public int contarCompletadasEnPeriodo(LocalDate inicio, LocalDate fin) {
-        // Implementación real: Se usaría un método personalizado del repositorio.
-        // List<Tarea> completadas = tareaRepository.findByEstadoAndFechaVencimientoBetween("COMPLETADA", inicio, fin);
-        // return completadas.size();
-        System.out.println("DEBUG: Contando tareas completadas para reporte...");
-        return 50; // Valor de prueba
+        return (int) tareaRepository.findByEstadoOrderByPrioridadDesc("COMPLETADA").stream()
+                .filter(t -> t.getFechaVencimiento() != null &&
+                        !t.getFechaVencimiento().isBefore(inicio) &&
+                        !t.getFechaVencimiento().isAfter(fin))
+                .count();
     }
 
-    /**
-     * CRUCIAL PARA EL REPORTE SEMANAL (Módulo 5)
-     * Cuenta el número de tareas pendientes en un período.
-     */
+    // Contar tareas pendientes en un rango de fechas
     public int contarPendientesEnPeriodo(LocalDate inicio, LocalDate fin) {
-        // Implementación real: Similar al anterior, pero filtrando por estado PENDIENTE.
-        System.out.println("DEBUG: Contando tareas pendientes para reporte...");
-        return 10; // Valor de prueba
+        return (int) tareaRepository.findByEstadoOrderByPrioridadDesc("PENDIENTE").stream()
+                .filter(t -> t.getFechaVencimiento() != null &&
+                        !t.getFechaVencimiento().isBefore(inicio) &&
+                        !t.getFechaVencimiento().isAfter(fin))
+                .count();
     }
 }

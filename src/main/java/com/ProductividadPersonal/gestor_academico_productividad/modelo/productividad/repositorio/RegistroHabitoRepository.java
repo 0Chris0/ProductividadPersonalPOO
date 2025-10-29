@@ -12,9 +12,10 @@ import java.util.List;
 @Repository
 public interface RegistroHabitoRepository extends JpaRepository<RegistroHabito, Long> {
 
-    // Ejemplo de método de búsqueda: Obtener el registro para un hábito específico en una fecha
     Optional<RegistroHabito> findByHabitoAndFecha(Habito habito, LocalDate fecha);
 
-    // Ejemplo: Obtener todos los registros completados para un hábito
     List<RegistroHabito> findByHabitoAndCompletadoTrue(Habito habito);
+
+    // <-- Método necesario para contar hábitos completados en un rango de fechas
+    int countByFechaBetweenAndCompletadoTrue(LocalDate inicio, LocalDate fin);
 }

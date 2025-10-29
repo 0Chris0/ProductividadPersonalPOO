@@ -1,71 +1,86 @@
 package com.ProductividadPersonal.gestor_academico_productividad.vista.productividad.componentes;
 
-import com.ProductividadPersonal.gestor_academico_productividad.vista.productividad.controlador.ProductividadController;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+
+import org.springframework.stereotype.Component;
 
 @Component
 public class PanelPomodoro extends JPanel {
 
-    private final ProductividadController productividadController;
-    private JLabel lblTiempo;
-    private JButton btnIniciar;
+    private JLabel labelTiempo;
+    private JButton botonIniciar, botonPausa;
+    private JSpinner spinnerMinutos;
     private Timer timer;
-    private int segundosTotales = 25 * 60; // 25 minutos
+    private int segundos;
 
-    @Autowired
-    public PanelPomodoro(ProductividadController productividadController) {
-        this.productividadController = productividadController;
-        setLayout(new FlowLayout(FlowLayout.CENTER, 20, 20));
+    private boolean pausado = false;
 
-        // Configuración del Label de Tiempo
-        lblTiempo = new JLabel("25:00");
-        lblTiempo.setFont(new Font("Monospaced", Font.BOLD, 48));
+    public PanelPomodoro() {
+        setLayout(new BorderLayout(20,20));
+        setBorder(BorderFactory.createEmptyBorder(20,20,20,20));
 
-        btnIniciar = new JButton("Iniciar Enfoque");
-        btnIniciar.addActionListener(e -> iniciarSesion());
+        JLabel titulo = new JLabel("Temporizador Pomodoro", SwingConstants.CENTER);
+        titulo.setFont(new Font("Arial", Font.BOLD, 24));
+        add(titulo, BorderLayout.NORTH);
 
-        add(lblTiempo);
-        add(btnIniciar);
+        JPanel centro = new JPanel(new BorderLayout(10,10));
+        labelTiempo = new JLabel("25:00", SwingConstants.CENTER);
+        labelTiempo.setFont(new Font("Arial", Font.BOLD, 48));
+        centro.add(labelTiempo, BorderLayout.CENTER);
 
-        // Inicializar Timer
-        timer = new Timer(1000, new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                actualizarReloj();
+        spinnerMinutos = new JSpinner(new SpinnerNumberModel(25, 1, 120, 1));
+        JPanel panelSpinner = new JPanel();
+        panelSpinner.add(new JLabel("Minutos:"));
+        panelSpinner.add(spinnerMinutos);
+        centro.add(panelSpinner, BorderLayout.SOUTH);
+
+        add(centro, BorderLayout.CENTER);
+
+        // Botones
+        JPanel panelBotones = new JPanel();
+        botonIniciar = new JButton("Iniciar");
+        botonPausa = new JButton("Pausar");
+        botonPausa.setEnabled(false); // Al inicio está deshabilitado
+        panelBotones.add(botonIniciar);
+        panelBotones.add(botonPausa);
+        add(panelBotones, BorderLayout.SOUTH);
+
+        // Timer
+        timer = new Timer(1000, e -> {
+            if(segundos > 0){
+                segundos--;
+                int min = segundos / 60;
+                int sec = segundos % 60;
+                labelTiempo.setText(String.format("%02d:%02d", min, sec));
+            } else {
+                timer.stop();
+                JOptionPane.showMessageDialog(PanelPomodoro.this, "¡Tiempo terminado!", "Pomodoro", JOptionPane.INFORMATION_MESSAGE);
+                botonPausa.setEnabled(false);
             }
         });
-    }
 
-    private void iniciarSesion() {
-        segundosTotales = 25 * 60; // Reinicia a 25 minutos
-        timer.start();
-        btnIniciar.setText("Detener");
-        btnIniciar.addActionListener(e -> detenerSesion());
-        JOptionPane.showMessageDialog(this, "Sesión Pomodoro Iniciada. ¡A enfocarse!");
-    }
+        // Acciones
+        botonIniciar.addActionListener(e -> {
+            int minutos = (Integer) spinnerMinutos.getValue();
+            segundos = minutos * 60;
+            labelTiempo.setText(String.format("%02d:%02d", minutos, 0));
+            timer.restart();
+            pausado = false;
+            botonPausa.setText("Pausar");
+            botonPausa.setEnabled(true);
+        });
 
-    private void detenerSesion() {
-        timer.stop();
-        // Llama al servicio para registrar el tiempo que se usó
-        productividadController.registrarFinSesion(25);
-        btnIniciar.setText("Iniciar Enfoque (Listo)");
-    }
-
-    private void actualizarReloj() {
-        if (segundosTotales <= 0) {
-            detenerSesion();
-            JOptionPane.showMessageDialog(this, "¡Tiempo Terminado!");
-            return;
-        }
-        segundosTotales--;
-        int minutos = segundosTotales / 60;
-        int segundos = segundosTotales % 60;
-        lblTiempo.setText(String.format("%02d:%02d", minutos, segundos));
+        botonPausa.addActionListener(e -> {
+            if(pausado){
+                timer.start();
+                botonPausa.setText("Pausar");
+                pausado = false;
+            } else {
+                timer.stop();
+                botonPausa.setText("Continuar");
+                pausado = true;
+            }
+        });
     }
 }

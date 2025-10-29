@@ -1,146 +1,170 @@
 package com.ProductividadPersonal.gestor_academico_productividad.vista.organizacion.componentes;
 
 import com.ProductividadPersonal.gestor_academico_productividad.modelo.organizacion.entidad.Tarea;
-import com.ProductividadPersonal.gestor_academico_productividad.vista.organizacion.controlador.TareaController;
-import jakarta.annotation.PostConstruct;
+import com.ProductividadPersonal.gestor_academico_productividad.servicio.organizacion.TareaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.List;
-import static java.awt.Component.LEFT_ALIGNMENT; // <--- ESTA LÍNEA ES CRÍTICA
 
 @Component
 public class PanelKanban extends JPanel {
 
-    private final TareaController tareaController;
+    private final TareaService tareaService;
 
-    // Componentes del formulario
-    private JTextField txtTituloTarea;
-    private JButton btnAgregarTarea;
+    private DefaultListModel<Tarea> modeloPendiente;
+    private DefaultListModel<Tarea> modeloEnProceso;
+    private DefaultListModel<Tarea> modeloCompletada;
 
-    private JPanel panelColumnas; // Contenedor para las 3 columnas
-    private JPanel panelPendientes;
-    private JPanel panelProceso;
-    private JPanel panelCompletadas;
+    private JList<Tarea> listaPendiente;
+    private JList<Tarea> listaEnProceso;
+    private JList<Tarea> listaCompletada;
 
     @Autowired
-    public PanelKanban(TareaController tareaController) {
-        this.tareaController = tareaController;
+    public PanelKanban(TareaService tareaService) {
+        this.tareaService = tareaService;
 
-        // Usamos BorderLayout para dividir entre el formulario (Norte) y las columnas (Centro)
-        setLayout(new BorderLayout(10, 10));
+        setLayout(new BorderLayout(15, 15));
+        setBorder(new EmptyBorder(10,10,10,10));
+        setBackground(new Color(245, 245, 245));
 
-        // --- 1. Crear el Formulario de Agregación Rápida ---
-        JPanel panelSuperior = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        txtTituloTarea = new JTextField(25);
-        btnAgregarTarea = new JButton(" + Agregar Tarea");
+        JLabel titulo = new JLabel("Organizacion", SwingConstants.CENTER);
+        titulo.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        add(titulo, BorderLayout.NORTH);
 
-        panelSuperior.add(new JLabel("Nueva Tarea:"));
-        panelSuperior.add(txtTituloTarea);
-        panelSuperior.add(btnAgregarTarea);
+        // --- Panel columnas ---
+        JPanel columnas = new JPanel(new GridLayout(1, 3, 15, 0));
+        columnas.setBackground(new Color(245, 245, 245));
 
-        this.add(panelSuperior, BorderLayout.NORTH);
+        // Inicializar modelos
+        modeloPendiente = new DefaultListModel<>();
+        modeloEnProceso = new DefaultListModel<>();
+        modeloCompletada = new DefaultListModel<>();
 
-        // --- 2. Crear el Contenedor de Columnas ---
-        panelColumnas = new JPanel(new GridLayout(1, 3, 10, 10));
+        // Crear listas
+        listaPendiente = crearLista(modeloPendiente, "PENDIENTE");
+        listaEnProceso = crearLista(modeloEnProceso, "EN PROCESO");
+        listaCompletada = crearLista(modeloCompletada, "COMPLETADA");
 
-        panelPendientes = crearColumnaKanban("PENDIENTE", "Tareas Pendientes");
-        panelProceso = crearColumnaKanban("EN_PROCESO", "En Proceso");
-        panelCompletadas = crearColumnaKanban("COMPLETADA", "Completadas");
+        columnas.add(new JScrollPane(listaPendiente));
+        columnas.add(new JScrollPane(listaEnProceso));
+        columnas.add(new JScrollPane(listaCompletada));
 
-        panelColumnas.add(panelPendientes);
-        panelColumnas.add(panelProceso);
-        panelColumnas.add(panelCompletadas);
+        add(columnas, BorderLayout.CENTER);
 
-        this.add(panelColumnas, BorderLayout.CENTER);
+        // --- Panel de botones ---
+        JPanel panelBotones = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
+        panelBotones.setBackground(new Color(245, 245, 245));
 
-        // --- 3. Listener del botón de Agregar ---
-        btnAgregarTarea.addActionListener(e -> agregarNuevaTarea());
-    }
+        JButton btnAgregar = crearBoton("Agregar Tarea", new Color(100,149,237));
+        JButton btnMover = crearBoton("Mover Tarea", new Color(60,179,113));
+        JButton btnBorrar = crearBoton("Borrar Tarea", new Color(220,20,60));
 
-    @PostConstruct
-    public void inicializar() {
+        panelBotones.add(btnAgregar);
+        panelBotones.add(btnMover);
+        panelBotones.add(btnBorrar);
+
+        add(panelBotones, BorderLayout.SOUTH);
+
+        // --- Acciones ---
+        btnAgregar.addActionListener(e -> agregarTarea());
+        btnMover.addActionListener(e -> moverTarea());
+        btnBorrar.addActionListener(e -> borrarTarea());
+
+        // Cargar datos iniciales
         cargarTareas();
     }
 
-    private JPanel crearColumnaKanban(String estado, String titulo) {
-        JPanel columna = new JPanel();
-        // Usamos BoxLayout para que las tarjetas se apilen verticalmente
-        columna.setLayout(new BoxLayout(columna, BoxLayout.Y_AXIS));
-        columna.setBorder(BorderFactory.createTitledBorder(titulo));
-        return columna;
+    private JList<Tarea> crearLista(DefaultListModel<Tarea> modelo, String estado) {
+        JList<Tarea> lista = new JList<>(modelo);
+        lista.setCellRenderer((list, value, index, isSelected, cellHasFocus) -> {
+            JLabel label = new JLabel(value.getTitulo() + " (P:" + value.getPrioridad() + ")");
+            label.setOpaque(true);
+            label.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));
+            if (isSelected) label.setBackground(new Color(173,216,230));
+            else label.setBackground(Color.WHITE);
+            return label;
+        });
+        lista.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        return lista;
     }
 
-    /** Lógica de agregación de la tarea */
-    private void agregarNuevaTarea() {
-        String titulo = txtTituloTarea.getText().trim();
-        if (titulo.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "El título no puede estar vacío.", "Error", JOptionPane.ERROR_MESSAGE);
+    private JButton crearBoton(String texto, Color color) {
+        JButton boton = new JButton(texto);
+        boton.setBackground(color);
+        boton.setForeground(Color.WHITE);
+        boton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        boton.setFocusPainted(false);
+        return boton;
+    }
+
+    private void cargarTareas() {
+        modeloPendiente.clear();
+        modeloEnProceso.clear();
+        modeloCompletada.clear();
+
+        List<Tarea> pendientes = tareaService.obtenerTareasPorEstado("PENDIENTE");
+        List<Tarea> enProceso = tareaService.obtenerTareasPorEstado("EN_PROCESO");
+        List<Tarea> completadas = tareaService.obtenerTareasPorEstado("COMPLETADA");
+
+        pendientes.forEach(modeloPendiente::addElement);
+        enProceso.forEach(modeloEnProceso::addElement);
+        completadas.forEach(modeloCompletada::addElement);
+    }
+
+    private void agregarTarea() {
+        String titulo = JOptionPane.showInputDialog(this, "Título de la tarea:");
+        if(titulo == null || titulo.trim().isEmpty()) return;
+
+        Tarea nueva = new Tarea();
+        nueva.setTitulo(titulo);
+        nueva.setEstado("PENDIENTE");
+        nueva.setPrioridad(3); // Baja por defecto
+
+        // Guardar en BD usando el primer tablero disponible
+        Tarea guardada = tareaService.guardarTarea(nueva, 1L);
+        modeloPendiente.addElement(guardada);
+    }
+
+    private void moverTarea() {
+        JList<Tarea> listaSeleccionada = listaPendiente.getSelectedIndex() != -1 ? listaPendiente :
+                listaEnProceso.getSelectedIndex() != -1 ? listaEnProceso :
+                        listaCompletada.getSelectedIndex() != -1 ? listaCompletada : null;
+        if(listaSeleccionada == null) {
+            JOptionPane.showMessageDialog(this, "Selecciona una tarea para mover.");
             return;
         }
 
-        try {
-            // Asumimos que el primer Tablero existente es el principal (ID 1, si lo inicializamos bien)
-            // Llama al servicio para obtener el ID del tablero
-            Long tableroId = tareaController.cargarTableros().stream().findFirst().get().getId();
+        Tarea tarea = listaSeleccionada.getSelectedValue();
+        String nuevoEstado = (String) JOptionPane.showInputDialog(this,
+                "Mover tarea a:",
+                "Mover",
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                new String[]{"PENDIENTE", "EN PROCESO", "COMPLETADA"},
+                tarea.getEstado());
+        if(nuevoEstado == null || nuevoEstado.equals(tarea.getEstado())) return;
 
-            // Guardamos la tarea, por defecto en estado PENDIENTE y Prioridad 1
-            tareaController.crearTarea(titulo, "Sin descripción", tableroId);
-
-            txtTituloTarea.setText(""); // Limpiar el campo
-            cargarTareas(); // Recargar el Kanban
-
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Error al crear tarea: " + ex.getMessage(), "Error de BD", JOptionPane.ERROR_MESSAGE);
-        }
+        tareaService.moverTarea(tarea.getId(), nuevoEstado);
+        cargarTareas();
     }
 
-    /** Recarga de la vista y botones */
-    public void cargarTareas() {
-        panelPendientes.removeAll();
-        panelProceso.removeAll();
-        panelCompletadas.removeAll();
-
-        try {
-            List<Tarea> pendientes = tareaController.obtenerTareasPorEstado("PENDIENTE");
-            List<Tarea> proceso = tareaController.obtenerTareasPorEstado("EN_PROCESO");
-            List<Tarea> completadas = tareaController.obtenerTareasPorEstado("COMPLETADA");
-
-            // Lógica de visualización
-            pendientes.forEach(t -> panelPendientes.add(crearTarjetaTarea(t, "EN_PROCESO")));
-            proceso.forEach(t -> panelProceso.add(crearTarjetaTarea(t, "COMPLETADA")));
-            completadas.forEach(t -> panelCompletadas.add(crearTarjetaTarea(t, "PENDIENTE")));
-
-        } catch (Exception e) {
-            panelPendientes.add(new JLabel("Error al cargar tareas: " + e.getMessage()));
+    private void borrarTarea() {
+        JList<Tarea> listaSeleccionada = listaPendiente.getSelectedIndex() != -1 ? listaPendiente :
+                listaEnProceso.getSelectedIndex() != -1 ? listaEnProceso :
+                        listaCompletada.getSelectedIndex() != -1 ? listaCompletada : null;
+        if(listaSeleccionada == null) {
+            JOptionPane.showMessageDialog(this, "Selecciona una tarea para borrar.");
+            return;
         }
-
-        revalidate();
-        repaint();
-    }
-
-    private JButton crearTarjetaTarea(Tarea tarea, String siguienteEstado) {
-        JButton tarjeta = new JButton("<html><b>" + tarea.getTitulo() + "</b><br><small>Prioridad: " + tarea.getPrioridad() + "</small></html>");
-
-        // CORRECCIÓN FINAL: Usamos la constante que ya fue importada estáticamente
-        tarjeta.setAlignmentX(LEFT_ALIGNMENT);
-
-        tarjeta.setToolTipText(tarea.getDescripcion());
-
-        // Listener para mover la tarjeta (interacción clave)
-        tarjeta.addActionListener(e -> {
-            try {
-                // LLAMADA CORREGIDA: Asumimos que TareaController.moverTarea devuelve Tarea
-                tareaController.moverTarea(tarea.getId(), siguienteEstado);
-                JOptionPane.showMessageDialog(this, "Tarea movida a " + siguienteEstado + "!", "Movimiento Exitoso", JOptionPane.INFORMATION_MESSAGE);
-                cargarTareas(); // Recargar la vista para reflejar el cambio
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error al mover la tarea: " + ex.getMessage(), "Error de BD", JOptionPane.ERROR_MESSAGE);
-            }
-        });
-        return tarjeta;
+        Tarea tarea = listaSeleccionada.getSelectedValue();
+        int resp = JOptionPane.showConfirmDialog(this, "¿Borrar tarea \""+tarea.getTitulo()+"\"?", "Confirmar", JOptionPane.YES_NO_OPTION);
+        if(resp == JOptionPane.YES_OPTION) {
+            tareaService.borrarTarea(tarea.getId());
+            cargarTareas();
+        }
     }
 }
